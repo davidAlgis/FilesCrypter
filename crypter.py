@@ -1,11 +1,11 @@
 import os
+import argparse
 from getpass import getpass
 from Crypto.Cipher import AES
 from Crypto.Util import Padding
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
-import base64
 
 
 def generate_key(password, salt, key_length=32):
@@ -43,41 +43,55 @@ def decrypt_file(key, in_filename, out_filename):
                 if len(chunk) == 0:
                     break
                 decrypted_chunk = cipher.decrypt(chunk)
-                outfile.write(Padding.unpad(decrypted_chunk, 16))
+                try:
+                    outfile.write(Padding.unpad(decrypted_chunk, 16))
+                except Exception as e:
+                    print(
+                        f"Password or salt incorrect. Unable to decrypt, raise exception :{e}")
+                    return
 
 
-# Create a directory to store the salt and encrypted files
-encrypted_dir = "encrypted_files"
-os.makedirs(encrypted_dir, exist_ok=True)
+def main():
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description="Encrypt or decrypt a file using AES.")
+    parser.add_argument("-a", "--action", choices=[
+                        "encrypt", "decrypt"], help="Whether to encrypt or decrypt the file.")
+    args = parser.parse_args()
 
-# # Prompt the user for a password
-# password = getpass("Enter a password: ")
+    # Create a directory to store the salt and encrypted files
+    encrypted_dir = "encrypted_files"
+    os.makedirs(encrypted_dir, exist_ok=True)
 
-# salt = os.urandom(16)
-# with open(os.path.join(encrypted_dir, "salt"), "wb") as salt_file:
-#     salt_file.write(salt)
+    # Prompt the user for a password
+    password = getpass("Enter a password: ")
 
-# # Generate a key from the password and salt
-# with open(os.path.join(encrypted_dir, "salt"), "rb") as salt_file:
-#     salt = salt_file.read()
-# key = generate_key(password.encode("utf-8"), salt)
+    # Encrypt or decrypt the file based on the user's choice
+    if args.action == "encrypt":
+        # Generate a random salt and store it in the directory
+        salt = os.urandom(16)
+        with open(os.path.join(encrypted_dir, "salt"), "wb") as salt_file:
+            salt_file.write(salt)
 
-# # Encrypt a file using the generated key
-# in_filename = "input_file.txt"
-# out_filename = os.path.join(encrypted_dir, "encrypted_file.bin")
-# encrypt_file(key, in_filename, out_filename)
+        # Generate a key from the password and salt
+        with open(os.path.join(encrypted_dir, "salt"), "rb") as salt_file:
+            salt = salt_file.read()
+        key = generate_key(password.encode("utf-8"), salt)
+        in_filename = "input_file.txt"
+        out_filename = os.path.join(encrypted_dir, "encrypted_file.bin")
+        encrypt_file(key, in_filename, out_filename)
+    else:
+        # If decrypting, read the salt from the directory
+        with open(os.path.join(encrypted_dir, "salt"), "rb") as salt_file:
+            salt = salt_file.read()
+        # Generate the key from the password and salt
+        key = generate_key(password.encode("utf-8"), salt)
 
-# Later, when the user wants to decrypt the file...
+        # Decrypt the file using the generated key
+        in_filename = os.path.join(encrypted_dir, "encrypted_file.bin")
+        out_filename = "decrypted_file.txt"
+        decrypt_file(key, in_filename, out_filename)
 
-# Prompt the user for the password again
-password = getpass("Enter the password: ")
 
-# Generate the key from the password and salt
-with open(os.path.join(encrypted_dir, "salt"), "rb") as salt_file:
-    salt = salt_file.read()
-key = generate_key(password.encode("utf-8"), salt)
-
-# Decrypt the file using the generated key
-in_filename = os.path.join(encrypted_dir, "encrypted_file.bin")
-out_filename = "decrypted_file.txt"
-decrypt_file(key, in_filename, out_filename)
+if __name__ == "__main__":
+    main()
