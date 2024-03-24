@@ -56,8 +56,9 @@ def decrypt_file(key, in_filename):
                     outfile.write(Padding.unpad(decrypted_chunk, 16))
                 except Exception as e:
                     print(
-                        f"Password or salt incorrect. Unable to decrypt, raise exception :{e}")
+                        f"\nPassword or salt incorrect. Unable to decrypt, raise exception :{e}")
                     hasException = True
+                    break
 
     if (not (hasException)):
         # Replace the original file with the temporary file
@@ -68,12 +69,17 @@ def decrypt_file(key, in_filename):
         return -1
 
 
-def process_files(action, directory):
-    password = getpass("Enter a password: ")
+def process_files(action, directory, password=""):
+    if (password != "test"):
+        password = getpass("Enter a password: ")
 
     saltFile = os.path.join(directory, "salt")
     if action == "encrypt":
-        passwordConfirmed = getpass("Re-enter a password: ")
+        if (password != "test"):
+            passwordConfirmed = getpass("Re-enter a password: ")
+        else:
+            passwordConfirmed = password
+
         if password != passwordConfirmed:
             print("Write two different password, please try again...")
             process_files(action, directory)
@@ -86,7 +92,7 @@ def process_files(action, directory):
         print("Salt file was created at ", directory,
               " root. This file is necessary for decrypting the files. Make sure to keep it at this root or you won't be able to recover your files !")
         key = generate_key(password.encode("utf-8"), salt)
-
+        print("Encrypting files...")
         for root, dirs, files in tqdm(os.walk(directory), total=1, desc="Directories"):
             for file in tqdm(files, desc="Files"):
                 if (file != "salt"):
@@ -100,6 +106,7 @@ def process_files(action, directory):
             salt = salt_file.read()
         key = generate_key(password.encode("utf-8"), salt)
 
+        print("Decrypting files...")
         for root, dirs, files in tqdm(os.walk(directory), total=1, desc="Directories"):
             for file in tqdm(files, desc="Files"):
                 if (file != "salt"):
@@ -113,6 +120,28 @@ def process_files(action, directory):
         os.remove(saltFile)
 
 
+def test():
+    directory = "test"
+    process_files("encrypt", directory, "test")
+    ret = process_files("decrypt", directory, "test")
+    if ret == -1:
+        print("Error while decrypting ", testFile, " file. Test failed !")
+        return -1
+    testFile = os.path.join(directory, "testFile.txt")
+    if not (os.path.isfile(testFile)):
+        print("Cannot find ", testFile, " file. Test failed !")
+        return -2
+    with open(testFile, "r+") as test_file:
+        content = test_file.read()
+        originalContent = "hello world !"
+        if (content != originalContent):
+            print("Test file didn't recover its original content :",
+                  content, "but should be : ", originalContent, ". Test failed !")
+            return -3
+    print("Test succeed !")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Encrypt or decrypt files in a directory using AES.")
@@ -120,9 +149,14 @@ def main():
                         "encrypt", "decrypt"], help="Whether to encrypt or decrypt the files.")
     parser.add_argument("-d", "--directory",
                         help="Directory containing the files.")
+    parser.add_argument("-t", "--test", action="store_true",
+                        help="Whether to test the encryption and decryption on the 'test' directory.")
     args = parser.parse_args()
 
-    process_files(args.action, args.directory)
+    if args.test:
+        test()
+    else:
+        process_files(args.action, args.directory)
 
 
 if __name__ == "__main__":
