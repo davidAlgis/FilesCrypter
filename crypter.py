@@ -30,15 +30,22 @@ def encrypt_file(key, in_filename):
             # Write the IV at the beginning of the file
             outfile.write(iv)
             cipher = AES.new(key, AES.MODE_CBC, iv=iv)
+
             while True:
                 chunk = infile.read(chunksize)
                 if len(chunk) == 0:
+                    # End of file reached; add padding
+                    padding = Padding.pad(b'', AES.block_size)
+                    outfile.write(cipher.encrypt(padding))
                     break
-                elif len(chunk) % 16 != 0:
-                    chunk = Padding.pad(chunk, 16)
+                elif len(chunk) % AES.block_size != 0:
+                    # Last chunk; pad it
+                    padded_chunk = Padding.pad(chunk, AES.block_size)
+                    outfile.write(cipher.encrypt(padded_chunk))
+                    break
+                else:
+                    # Middle chunk; no padding
                     outfile.write(cipher.encrypt(chunk))
-                    break  # Last chunk
-                outfile.write(cipher.encrypt(chunk))
 
     # Replace the original file with the temporary file
     try:
@@ -55,30 +62,29 @@ def decrypt_file(key, in_filename):
     with open(in_filename, 'rb') as infile:
         with open(temp_filename, 'wb') as outfile:
             # Read the IV from the beginning of the file
-            iv = infile.read(16)
+            iv = infile.read(AES.block_size)
             cipher = AES.new(key, AES.MODE_CBC, iv=iv)
 
-            prev_chunk = None
+            next_chunk = b''
             while True:
                 chunk = infile.read(chunksize)
                 if len(chunk) == 0:
-                    if prev_chunk is not None:
-                        try:
-                            decrypted = cipher.decrypt(prev_chunk)
-                            decrypted = Padding.unpad(decrypted, 16)
-                            outfile.write(decrypted)
-                        except Exception as e:
-                            print(
-                                f"\nError while decrypting {temp_filename}: {e}"
-                            )
-                            hasException = True
+                    try:
+                        decrypted_chunk = cipher.decrypt(next_chunk)
+                        decrypted_chunk = Padding.unpad(
+                            decrypted_chunk, AES.block_size)
+                        outfile.write(decrypted_chunk)
+                    except (ValueError, KeyError) as e:
+                        print(
+                            f"\nError while decrypting {temp_filename}: {e}. "
+                            "Password or salt might be incorrect.")
+                        hasException = True
                     break
 
-                if prev_chunk is not None:
-                    decrypted = cipher.decrypt(prev_chunk)
+                decrypted = cipher.decrypt(next_chunk)
+                if len(next_chunk) > 0:
                     outfile.write(decrypted)
-
-                prev_chunk = chunk
+                next_chunk = chunk
 
     if not hasException:
         # Replace the original file with the temporary file
@@ -148,7 +154,7 @@ def test():
     if not os.path.isfile(testFile):
         print(f"Cannot find {testFile}. Test failed!")
         return -2
-    with open(testFile, "r+") as test_file:
+    with open(testFile, "r+", encoding='utf-8') as test_file:
         content = test_file.read()
         originalContent = "hello world !"
         if content != originalContent:
