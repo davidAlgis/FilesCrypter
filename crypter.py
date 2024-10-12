@@ -95,13 +95,13 @@ def decrypt_file(key, in_filename):
         return -1
 
 
-def process_files(action, directory, password=""):
-    if password != "test":
+def process_files(action, directory, password="", test=False):
+    if not test:
         password = getpass("Enter a password: ")
 
     saltFile = os.path.join(directory, "salt")
     if action == "encrypt":
-        if password != "test":
+        if not test:
             passwordConfirmed = getpass("Re-enter a password: ")
         else:
             passwordConfirmed = password
@@ -145,8 +145,8 @@ def process_files(action, directory, password=""):
 
 def test():
     directory = "test"
-    process_files("encrypt", directory, "test")
-    ret = process_files("decrypt", directory, "test")
+    process_files("encrypt", directory, "test", True)
+    ret = process_files("decrypt", directory, "test", True)
     if ret == -1:
         print("Error while decrypting the test file. Test failed!")
         return -1
