@@ -120,7 +120,6 @@ def process_files(action, directory, password="", test=False):
             for file in tqdm(files, desc="Files", leave=False):
                 if file != "salt":
                     in_filename = os.path.join(root, file)
-                    print("Encrypting:", in_filename)
                     encrypt_file(key, in_filename)
     else:
         if not os.path.isfile(saltFile):
