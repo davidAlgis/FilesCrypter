@@ -37,7 +37,10 @@ def encrypt_file(key, in_filename):
                 outfile.write(cipher.encrypt(chunk))
 
     # Replace the original file with the temporary file
-    os.replace(temp_filename, in_filename)
+    try:
+        os.replace(temp_filename, in_filename)
+    except Exception as e:
+        print(f"unable to replace {in_filename} by {temp_filename}")
 
 
 def decrypt_file(key, in_filename):
@@ -56,7 +59,7 @@ def decrypt_file(key, in_filename):
                     outfile.write(Padding.unpad(decrypted_chunk, 16))
                 except Exception as e:
                     print(
-                        f"\nPassword or salt incorrect. Unable to decrypt, raise exception :{e}")
+                        f"\nError while writing decrypting files {temp_filename}. Password or salt might be incorrect. Unable to decrypt, raise exception :{e}")
                     hasException = True
                     break
 
